@@ -9,6 +9,9 @@ dependencies = [
     "langgraph>=0.2.6",
     "langchain-anthropic>=0.1.23",
     "langchain>=0.2.14",
+    "tavily-python>=0.7.11",
+    "langgraph-cli[inmem]>=0.3.8",
+    "langchain-deepseek>=0.1.4",
 ]
 
 

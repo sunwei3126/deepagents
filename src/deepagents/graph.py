@@ -2,12 +2,14 @@ from deepagents.sub_agent import _create_task_tool, SubAgent
 from deepagents.model import get_default_model
 from deepagents.tools import write_todos, write_file, read_file, ls, edit_file
 from deepagents.state import DeepAgentState
-from typing import Sequence, Union, Callable, Any, TypeVar, Type, Optional, Dict
+from deepagents.compression import CompressionConfig, create_compression_pre_hook
+from typing import Sequence, Union, Callable, Any, TypeVar, Type, Optional, List
 from langchain_core.tools import BaseTool
 from langchain_core.language_models import LanguageModelLike
 from deepagents.interrupt import create_interrupt_hook, ToolInterruptConfig
 from langgraph.types import Checkpointer
 from langgraph.prebuilt import create_react_agent
+
 
 StateSchema = TypeVar("StateSchema", bound=DeepAgentState)
 StateSchemaType = Type[StateSchema]
@@ -25,6 +27,28 @@ It is critical that you mark todos as completed as soon as you are done with a t
 - When doing web search, prefer to use the `task` tool in order to reduce context usage."""
 
 
+def chain_hooks(hooks: List[Callable]) -> Callable:
+    """Chain multiple hooks together.
+    
+    Args:
+        hooks: List of hook functions that take state and return updates
+    
+    Returns:
+        Combined hook function that applies all hooks in sequence
+    """
+    def combined_hook(state):
+        updates = {}
+        for hook in hooks:
+            hook_result = hook(state)
+            if hook_result:
+                updates.update(hook_result)
+                # Apply updates to state for next hook
+                state = {**state, **hook_result}
+        return updates if updates else None
+    
+    return combined_hook
+
+
 def create_deep_agent(
     tools: Sequence[Union[BaseTool, Callable, dict[str, Any]]],
     instructions: str,
@@ -32,6 +56,7 @@ def create_deep_agent(
     subagents: list[SubAgent] = None,
     state_schema: Optional[StateSchemaType] = None,
     interrupt_config: Optional[ToolInterruptConfig] = None,
+    compression_config: Optional[CompressionConfig] = None,
     config_schema: Optional[Type[Any]] = None,
     checkpointer: Optional[Checkpointer] = None,
     post_model_hook: Optional[Callable] = None,
@@ -55,9 +80,10 @@ def create_deep_agent(
                 - (optional) `model` (either a LanguageModelLike instance or dict settings)
         state_schema: The schema of the deep agent. Should subclass from DeepAgentState
         interrupt_config: Optional Dict[str, HumanInterruptConfig] mapping tool names to interrupt configs.
-
+        compression_config: Optional CompressionConfig for automatic context compression.
         config_schema: The schema of the deep agent.
         checkpointer: Optional checkpointer for persisting agent state between runs.
+        post_model_hook: Optional custom post model hook. Can be used with compression_config.
     """
     
     prompt = instructions + base_prompt
@@ -74,24 +100,26 @@ def create_deep_agent(
     )
     all_tools = built_in_tools + list(tools) + [task_tool]
     
-    # Should never be the case that both are specified
-    if post_model_hook and interrupt_config:
-        raise ValueError(
-            "Cannot specify both post_model_hook and interrupt_config together. "
-            "Use either interrupt_config for tool interrupts or post_model_hook for custom post-processing."
-        )
-    elif post_model_hook is not None:
-        selected_post_model_hook = post_model_hook
-    elif interrupt_config is not None:
-        selected_post_model_hook = create_interrupt_hook(interrupt_config)
-    else:
-        selected_post_model_hook = None
+    # Set up compression pre-model hook if configured
+    compression_pre_hook = None
+    if compression_config is not None:
+        compression_pre_hook = create_compression_pre_hook(compression_config)
+    
+    # Set up post-model hooks (interrupt + custom)
+    post_hooks = []
+    if interrupt_config is not None:
+        post_hooks.append(create_interrupt_hook(interrupt_config))
+    if post_model_hook is not None:
+        post_hooks.append(post_model_hook)
+    
+    selected_post_model_hook = chain_hooks(post_hooks) if post_hooks else None
     
     return create_react_agent(
         model,
         prompt=prompt,
         tools=all_tools,
         state_schema=state_schema,
+        pre_model_hook=compression_pre_hook,
         post_model_hook=selected_post_model_hook,
         config_schema=config_schema,
         checkpointer=checkpointer,

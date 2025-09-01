@@ -2,9 +2,10 @@ import os
 from typing import Literal
 
 from tavily import TavilyClient
-
+from langchain_deepseek import ChatDeepSeek
 
 from deepagents import create_deep_agent, SubAgent
+ 
  
 # It's best practice to initialize the client once and reuse it.
 tavily_client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
@@ -158,9 +159,12 @@ You have access to a few tools.
 Use this to run an internet search for a given query. You can specify the number of results, the topic, and whether raw content should be included.
 """
 
+model = ChatDeepSeek(model="deepseek-chat") 
+
 # Create the agent
 agent = create_deep_agent(
     [internet_search],
     research_instructions,
+    model=model,
     subagents=[critique_sub_agent, research_sub_agent],
 ).with_config({"recursion_limit": 1000})

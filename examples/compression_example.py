@@ -2,6 +2,10 @@
 
 from deepagents import create_deep_agent, CompressionConfig
 from langchain_deepseek import ChatDeepSeek
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 def simple_tool(message: str) -> str:
     """A simple tool that returns the message with a prefix."""
@@ -10,12 +14,12 @@ def simple_tool(message: str) -> str:
 
 def main():
     print("=== DeepAgents LangGraph Compression Example ===\n")
-    model = ChatDeepSeek(model="deepseek-chat", 
-                         api_key="sk-835453322a2b4bfb96ef8294411372e9")  # Replace with your actual API key
+    api_key=os.environ["DEEPSEEK_API_KEY"]
+    model = ChatDeepSeek(model="deepseek-chat", api_key=api_key)
     
     # Create LangGraph-native compression config
     compression_config = CompressionConfig(
-        max_tokens=120000,        # Winodw Size for model
+        max_tokens=1000,        # Winodw Size for model
         strategy="last",        # Keep most recent messages
         start_on="human",       # Start counting from human messages
         end_on=("human", "tool"), # Valid endpoints

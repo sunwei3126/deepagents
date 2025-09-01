@@ -2,8 +2,9 @@ from deepagents.sub_agent import _create_task_tool, SubAgent
 from deepagents.model import get_default_model
 from deepagents.tools import write_todos, write_file, read_file, ls, edit_file
 from deepagents.state import DeepAgentState
-from typing import Sequence, Union, Callable, Any, TypeVar, Type, Optional, Dict
-from langchain_core.tools import BaseTool
+from deepagents.compression import CompressionConfig, create_compression_pre_hook
+from typing import Sequence, Union, Callable, Any, List, TypeVar, Type, Optional
+from langchain_core.tools import BaseTool, tool
 from langchain_core.language_models import LanguageModelLike
 from deepagents.interrupt import create_interrupt_hook, ToolInterruptConfig
 from langgraph.types import Checkpointer
